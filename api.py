@@ -4,6 +4,7 @@ api.py — FastAPI backend for the network diagram generator.
 Run with: uvicorn api:app --reload
 """
 
+import ipaddress
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Response
@@ -30,12 +31,18 @@ class DiagramRequest(BaseModel):
     include_lbs:       bool = True
     include_dns:       bool = False
     include_ntp:       bool = False
+    mgmt_pool:         str | None = None
     filename:          str = Field(default="leaf_spine", max_length=128)
 
     @model_validator(mode="after")
     def validate(self):
         if self.fabrics > 1 and self.super_spines == 0:
             raise ValueError("fabrics requires super_spines to be set")
+        if self.mgmt_pool:
+            try:
+                ipaddress.ip_network(self.mgmt_pool, strict=False)
+            except ValueError:
+                raise ValueError(f"Invalid subnet: {self.mgmt_pool}")
         name = self.filename.strip().removesuffix(".drawio") or "leaf_spine"
         self.filename = "".join(c for c in name if c.isalnum() or c in "-_ ") or "leaf_spine"
         return self
@@ -53,6 +60,7 @@ def generate(req: DiagramRequest):
             req.spines, req.leaves, req.borders, req.wan,
             req.super_spines, req.fabrics, req.vendor,
             req.include_firewalls, req.include_lbs, req.include_dns, req.include_ntp,
+            req.mgmt_pool,
         )
         xml_str = diagram.to_xml()
     except ValueError as e:

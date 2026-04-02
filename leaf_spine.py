@@ -10,6 +10,7 @@ Topology (top to bottom):
 """
 
 import argparse
+import ipaddress
 from network_diagram import NetworkDiagram, DeviceType
 
 # Vendor configuration: maps role → (DeviceType, model, short_label)
@@ -41,6 +42,7 @@ def build_diagram(
     include_lbs:       bool = True,
     include_dns:       bool = False,
     include_ntp:       bool = False,
+    mgmt_pool:         str | None = None,
 ) -> NetworkDiagram:
     """Build and return a configured NetworkDiagram (not yet saved)."""
     vc = VENDOR_CONFIG[vendor]
@@ -242,6 +244,20 @@ def build_diagram(
     diagram.H_SPACING = 150
     diagram.V_SPACING = 220
 
+    # --- Management IP allocation ---
+    if mgmt_pool:
+        network = ipaddress.ip_network(mgmt_pool, strict=False)
+        hosts = network.hosts()
+        for node in diagram._nodes.values():
+            try:
+                node.attrs["mgmt_ip"] = str(next(hosts))
+            except StopIteration:
+                raise ValueError(
+                    f"Management pool {mgmt_pool} exhausted after "
+                    f"{network.num_addresses - 2} addresses — "
+                    f"use a larger subnet."
+                )
+
     return diagram
 
 
@@ -258,6 +274,7 @@ def main():
     parser.add_argument("--dns",           action="store_true",       help="Add 2 DNS servers per fabric")
     parser.add_argument("--ntp",           action="store_true",       help="Add 2 NTP servers per fabric")
     parser.add_argument("--vendor",        type=str, default="cisco", choices=["cisco", "arista"], help="Switch vendor")
+    parser.add_argument("--mgmt-pool",     type=str, default=None, help="Subnet to allocate management IPs from (e.g. 10.0.0.0/24)")
     parser.add_argument("--output",        type=str, default="leaf_spine", help="Output filename without extension")
     args = parser.parse_args()
 
@@ -269,6 +286,7 @@ def main():
         args.spine, args.leaf, args.border, args.wan,
         args.super_spine, args.fabric, args.vendor,
         not args.no_firewalls, not args.no_lb, args.dns, args.ntp,
+        args.mgmt_pool,
     )
     diagram.save(output)
 

@@ -365,17 +365,23 @@ class NetworkDiagram:
             w, h = _SIZE[node.device_type]
             style = _STYLES[node.device_type]
 
-            # Build tooltip from extra attrs
-            tooltip = "  ".join(f"{k}: {v}" for k, v in node.attrs.items())
+            # Build tooltip string from non-None attrs (shown on hover in draw.io)
+            tooltip = "  ".join(
+                f"{k}: {v}" for k, v in node.attrs.items() if v is not None
+            )
+
+            # UserObject wraps mxCell so each attr becomes a draw.io Custom Property
+            user_obj_attrs = {"label": node.label, "id": xml_id, "tooltip": tooltip}
+            for k, v in node.attrs.items():
+                if v is not None:
+                    user_obj_attrs[k] = str(v)
+            user_obj = ET.SubElement(root, "UserObject", **user_obj_attrs)
 
             cell = ET.SubElement(
-                root, "mxCell",
-                id=xml_id,
-                value=node.label,
+                user_obj, "mxCell",
                 style=style,
                 vertex="1",
                 parent="1",
-                tooltip=tooltip,
             )
             ET.SubElement(
                 cell, "mxGeometry",
