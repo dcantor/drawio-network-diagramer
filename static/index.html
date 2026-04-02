@@ -274,9 +274,15 @@
       </div>
 
       <div class="section-label">Output <span class="optional-badge">optional</span></div>
-      <div class="field">
-        <label for="filename">Filename <span>(.drawio will be appended)</span></label>
-        <input id="filename" type="text" placeholder="leaf_spine" maxlength="128">
+      <div class="grid">
+        <div class="field">
+          <label for="filename">Filename <span>(.drawio will be appended)</span></label>
+          <input id="filename" type="text" placeholder="leaf_spine" maxlength="128">
+        </div>
+        <div class="field">
+          <label for="mgmt_pool">Management IP pool <span>(e.g. 10.0.0.0/24)</span></label>
+          <input id="mgmt_pool" type="text" placeholder="e.g. 10.0.0.0/24" maxlength="64">
+        </div>
       </div>
 
       <button type="submit" id="btn">Generate &amp; Download</button>
@@ -315,7 +321,8 @@
       const include_lbs       = document.getElementById("include_lbs").checked;
       const include_dns       = document.getElementById("include_dns").checked;
       const include_ntp       = document.getElementById("include_ntp").checked;
-      const filename = document.getElementById("filename").value.trim() || "leaf_spine";
+      const filename  = document.getElementById("filename").value.trim() || "leaf_spine";
+      const mgmt_pool = document.getElementById("mgmt_pool").value.trim() || null;
 
       btn.disabled = true;
       setStatus("Generating diagram…", "loading");
@@ -324,7 +331,7 @@
         const res = await fetch("/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ spines, leaves, borders, wan, super_spines, fabrics, vendor, include_firewalls, include_lbs, include_dns, include_ntp, filename }),
+          body: JSON.stringify({ spines, leaves, borders, wan, super_spines, fabrics, vendor, include_firewalls, include_lbs, include_dns, include_ntp, mgmt_pool, filename }),
         });
 
         if (!res.ok) {
