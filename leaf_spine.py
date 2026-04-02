@@ -53,7 +53,7 @@ def build_diagram(
     for i in range(1, wan + 1):
         node = diagram.add_node(
             f"wan{i}", f"WAN-{i:02d}\nISR 4321", DeviceType.ROUTER,
-            model="Cisco ISR 4321", role="WAN Router", loopback=f"10.3.0.{i}",
+            model="Cisco ISR 4321", role="WAN Router",
         )
         wan_routers.append(node)
 
@@ -63,7 +63,7 @@ def build_diagram(
     for i in range(1, borders + 1):
         node = diagram.add_node(
             f"border{i}", f"Border-{i:02d}\n{border_short}", border_type,
-            model=border_model, role="Border Leaf", loopback=f"10.2.0.{i}",
+            model=border_model, role="Border Leaf",
         )
         border_nodes.append(node)
 
@@ -73,7 +73,7 @@ def build_diagram(
     for i in range(1, super_spines + 1):
         node = diagram.add_node(
             f"sspine{i}", f"SS-{i:02d}\n{ss_short}", ss_type,
-            model=ss_model, role="Super Spine", loopback=f"10.4.0.{i}",
+            model=ss_model, role="Super Spine",
         )
         super_spine_nodes.append(node)
 
@@ -99,7 +99,6 @@ def build_diagram(
                 spine_type,
                 model=spine_model, role="Spine",
                 fabric=f if fabrics > 1 else None,
-                loopback=f"10.0.{f}.{i}",
             )
             fabric_spines.append(node)
 
@@ -111,7 +110,6 @@ def build_diagram(
                 leaf_type,
                 model=leaf_model, role="Leaf",
                 fabric=f if fabrics > 1 else None,
-                loopback=f"10.1.{f}.{i}",
                 rack=f"Rack-{((i - 1) // 2) + 1}",
             )
             fabric_leaves.append(node)
