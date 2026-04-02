@@ -47,6 +47,7 @@ Output is saved to `leaf_spine.drawio` by default. Use `--output` for a custom f
 | `--no-lb` | No | — | Omit load balancers |
 | `--dns` | No | — | Add 2 DNS servers per fabric |
 | `--ntp` | No | — | Add 2 NTP servers per fabric |
+| `--mgmt-pool` | No | — | Subnet to allocate management IPs from (e.g. `10.0.0.0/24`) |
 | `--output` | No | `leaf_spine` | Output filename without extension |
 
 ### Examples
@@ -61,9 +62,10 @@ python leaf_spine.py --spine 4 --leaf 10 --vendor arista --dns --ntp
 # Multi-fabric topology
 python leaf_spine.py --spine 4 --leaf 6 --super-spine 2 --fabric 3
 
-# Full topology, no load balancers
+# Full topology with management IPs, no load balancers
 python leaf_spine.py --spine 4 --leaf 10 --super-spine 2 --fabric 2 \
-  --border 2 --wan 2 --vendor cisco --dns --ntp --no-lb --output my_datacenter
+  --border 2 --wan 2 --vendor cisco --dns --ntp --no-lb \
+  --mgmt-pool 10.0.0.0/22 --output my_datacenter
 ```
 
 ## Topology
@@ -116,7 +118,7 @@ FW LB DNS NTP  (per fabric, all optional)
   | NTP Servers | Orange | NTP server nodes |
 
 - **Straight lines**, no arrowheads
-- **Tooltips** — hover any node in draw.io to see model, IP, role, and rack
+- **Custom Properties** — each node stores model, role, rack, and management IP as draw.io Custom Properties, visible in the Edit Data dialog and on hover
 
 ## API
 
@@ -137,6 +139,7 @@ FW LB DNS NTP  (per fabric, all optional)
   "include_lbs":       true,
   "include_dns":       false,
   "include_ntp":       false,
+  "mgmt_pool":         "10.0.0.0/22",
   "filename":          "my_datacenter"
 }
 ```
