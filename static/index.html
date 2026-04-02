@@ -113,6 +113,51 @@
       vertical-align: middle;
     }
 
+    .vendor-toggle {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .vendor-option {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      padding: 0.45rem 1rem;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #4a5568;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .vendor-option:has(input:checked) {
+      border-color: #036897;
+      background: #ebf8ff;
+      color: #036897;
+    }
+
+    .vendor-option input { display: none; }
+
+    .checkbox-row {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.75rem;
+    }
+
+    .checkbox-option {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #4a5568;
+      cursor: pointer;
+    }
+
+    .checkbox-option input { accent-color: #036897; }
+
     button[type="submit"] {
       margin-top: 2rem;
       width: 100%;
@@ -161,6 +206,21 @@
     </div>
 
     <form id="form" novalidate>
+      <div class="section-label">Vendor <span class="required-badge">required</span></div>
+      <div class="field">
+        <label for="vendor">Switch vendor</label>
+        <div class="vendor-toggle">
+          <label class="vendor-option">
+            <input type="radio" name="vendor" value="cisco" checked>
+            <span>Cisco</span>
+          </label>
+          <label class="vendor-option">
+            <input type="radio" name="vendor" value="arista">
+            <span>Arista</span>
+          </label>
+        </div>
+      </div>
+
       <div class="section-label">Core fabric <span class="required-badge">required</span></div>
       <div class="grid">
         <div class="field">
@@ -194,11 +254,23 @@
       </div>
 
       <div class="section-label">Services <span class="optional-badge">optional</span></div>
-      <div class="grid">
-        <div class="field">
-          <label for="dns">DNS servers <span>(min 2 if set)</span></label>
-          <input id="dns" type="number" value="0" min="0" max="20">
-        </div>
+      <div class="checkbox-row">
+        <label class="checkbox-option">
+          <input type="checkbox" id="include_firewalls" checked>
+          <span>Firewalls</span>
+        </label>
+        <label class="checkbox-option">
+          <input type="checkbox" id="include_lbs" checked>
+          <span>Load balancers</span>
+        </label>
+        <label class="checkbox-option">
+          <input type="checkbox" id="include_dns">
+          <span>DNS servers</span>
+        </label>
+        <label class="checkbox-option">
+          <input type="checkbox" id="include_ntp">
+          <span>NTP servers</span>
+        </label>
       </div>
 
       <div class="section-label">Output <span class="optional-badge">optional</span></div>
@@ -232,19 +304,18 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
+      const vendor  = document.querySelector('input[name="vendor"]:checked').value;
       const spines  = parseInt(document.getElementById("spines").value, 10);
       const leaves  = parseInt(document.getElementById("leaves").value, 10);
       const borders      = parseInt(document.getElementById("borders").value, 10) || 0;
       const wan          = parseInt(document.getElementById("wan").value, 10) || 0;
       const super_spines = parseInt(document.getElementById("super_spines").value, 10) || 0;
       const fabrics      = parseInt(document.getElementById("fabrics").value, 10) || 1;
-      const dns      = parseInt(document.getElementById("dns").value, 10) || 0;
+      const include_firewalls = document.getElementById("include_firewalls").checked;
+      const include_lbs       = document.getElementById("include_lbs").checked;
+      const include_dns       = document.getElementById("include_dns").checked;
+      const include_ntp       = document.getElementById("include_ntp").checked;
       const filename = document.getElementById("filename").value.trim() || "leaf_spine";
-
-      if (dns === 1) {
-        setStatus("Error: DNS servers requires a minimum of 2", "error");
-        return;
-      }
 
       btn.disabled = true;
       setStatus("Generating diagram…", "loading");
@@ -253,7 +324,7 @@
         const res = await fetch("/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ spines, leaves, borders, wan, super_spines, fabrics, dns, filename }),
+          body: JSON.stringify({ spines, leaves, borders, wan, super_spines, fabrics, vendor, include_firewalls, include_lbs, include_dns, include_ntp, filename }),
         });
 
         if (!res.ok) {

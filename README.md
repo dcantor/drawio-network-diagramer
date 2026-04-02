@@ -1,6 +1,6 @@
 # Network Diagram Generator
 
-Generates Cisco network topology diagrams in [draw.io](https://app.diagrams.net) format. Supports leaf-spine fabrics with optional super spine, WAN, border, multiple fabric pods, firewalls, load balancers, and DNS servers.
+Generates Cisco and Arista network topology diagrams in [draw.io](https://app.diagrams.net) format. Supports leaf-spine fabrics with optional super spine, WAN, border, multiple fabric pods, and per-fabric services.
 
 ## Quick Start
 
@@ -16,6 +16,7 @@ pip install -r requirements.txt
 ## Web App
 
 ```bash
+source .venv/bin/activate
 uvicorn api:app --reload
 ```
 
@@ -35,13 +36,17 @@ Output is saved to `leaf_spine.drawio` by default. Use `--output` for a custom f
 
 | Argument | Required | Default | Description |
 |---|---|---|---|
-| `--spine` | Yes | — | Spine switches per fabric (Cisco Nexus 9336C-FX2) |
-| `--leaf` | Yes | — | Leaf switches per fabric (Cisco Nexus 93180YC-FX) |
-| `--super-spine` | No | 0 | Super spine switches — sit between borders and fabric spines (Cisco Nexus 9508) |
+| `--spine` | Yes | — | Spine switches per fabric |
+| `--leaf` | Yes | — | Leaf switches per fabric |
+| `--super-spine` | No | 0 | Super spine switches (between borders and fabric spines) |
 | `--fabric` | No | 1 | Number of independent spine+leaf pods below the super spine layer. Requires `--super-spine` |
-| `--border` | No | 0 | Border leaf switches — sit above super spines (Cisco Nexus 93180YC-FX) |
-| `--wan` | No | 0 | WAN routers — sit above borders (Cisco ISR 4321) |
-| `--dns` | No | 0 | DNS servers per fabric — minimum 2 if set |
+| `--border` | No | 0 | Border leaf switches (above super spines) |
+| `--wan` | No | 0 | WAN routers (above borders) |
+| `--vendor` | No | `cisco` | Switch vendor: `cisco` or `arista` |
+| `--no-firewalls` | No | — | Omit firewalls |
+| `--no-lb` | No | — | Omit load balancers |
+| `--dns` | No | — | Add 2 DNS servers per fabric |
+| `--ntp` | No | — | Add 2 NTP servers per fabric |
 | `--output` | No | `leaf_spine` | Output filename without extension |
 
 ### Examples
@@ -50,14 +55,15 @@ Output is saved to `leaf_spine.drawio` by default. Use `--output` for a custom f
 # Minimal fabric
 python leaf_spine.py --spine 2 --leaf 4
 
-# Full single-fabric topology
-python leaf_spine.py --spine 4 --leaf 10 --border 2 --wan 2 --dns 4
+# Arista fabric with all services
+python leaf_spine.py --spine 4 --leaf 10 --vendor arista --dns --ntp
 
-# Multi-fabric topology with super spine
+# Multi-fabric topology
 python leaf_spine.py --spine 4 --leaf 6 --super-spine 2 --fabric 3
 
-# Everything
-python leaf_spine.py --spine 4 --leaf 10 --super-spine 2 --fabric 2 --border 2 --wan 2 --dns 4 --output my_datacenter
+# Full topology, no load balancers
+python leaf_spine.py --spine 4 --leaf 10 --super-spine 2 --fabric 2 \
+  --border 2 --wan 2 --vendor cisco --dns --ntp --no-lb --output my_datacenter
 ```
 
 ## Topology
@@ -70,24 +76,32 @@ WAN Routers          (--wan)
 Border Switches      (--border)
        │
 Super Spine          (--super-spine)
-     / | \
-    /  |  \──────────────────────┐
-   │         Fabric 1            │         Fabric 2 ...   (--fabric)
-   │   Spine Switches (--spine)  │   Spine Switches
-   │         │                   │         │
-   │   Leaf Switches  (--leaf)   │   Leaf Switches
-   │   │    │    │               │   │    │    │
-   │  FW   LB  DNS               │  FW   LB  DNS
-   └───────────────────────────────────────────────────────
+     /   \
+Fabric 1  Fabric 2 ...        (--fabric)
+ Spines    Spines
+   │         │
+ Leaves    Leaves
+ │ │ │ │   │ │ │ │
+FW LB DNS NTP  (per fabric, all optional)
 ```
 
-- **Firewalls** and **load balancers** are always created — 2 per fabric, attached to the first two leaf switches of each fabric
-- **DNS servers** (`--dns`) are distributed across the first two leaf switches of each fabric
-- When only one fabric is used (default), the `--super-spine` and `--fabric` arguments are optional
+- **Firewalls** — 2 per fabric, connected to the first two leaf switches (default: on)
+- **Load balancers** — 2 per fabric, connected to the first two leaf switches (default: on)
+- **DNS servers** — 2 per fabric, connected to the first two leaf switches (default: off)
+- **NTP servers** — 2 per fabric, connected to the first two leaf switches (default: off)
+
+## Switch Models
+
+| Role | Cisco | Arista |
+|---|---|---|
+| Super Spine | N9K-C9504 | DCS-7304X3 |
+| Spine | N9K-9508 | DCS-7308X3 |
+| Border | N9K-9504 | DCS-7304X3 |
+| Leaf | N9K-C93180YC-FX3 | DCS-7050SX3-48YC |
 
 ## Diagram Features
 
-- **Cisco icons** — routers, switches (spine, super spine, border, leaf), firewalls, servers, load balancers
+- **Cisco icons** for all device types; Arista switches rendered in red to distinguish from Cisco blue
 - **Colour-coded bounding boxes** per layer:
 
   | Box | Colour | Contents |
@@ -96,9 +110,10 @@ Super Spine          (--super-spine)
   | Core | Light grey | Border switches + super spines (multi-fabric only) |
   | Switches | Blue | All switches (single-fabric) |
   | Fabric 1 / 2 / … | Blue, green, yellow, … | Per-fabric spine + leaf nodes (multi-fabric) |
-  | Firewalls | Red | All firewall nodes |
-  | Load Balancers | Green | All load balancer nodes |
-  | DNS Servers | Purple | All DNS server nodes |
+  | Firewalls | Red | Firewall nodes |
+  | Load Balancers | Green | Load balancer nodes |
+  | DNS Servers | Purple | DNS server nodes |
+  | NTP Servers | Orange | NTP server nodes |
 
 - **Straight lines**, no arrowheads
 - **Tooltips** — hover any node in draw.io to see model, IP, role, and rack
@@ -111,18 +126,22 @@ Super Spine          (--super-spine)
 
 ```json
 {
-  "spines":       4,
-  "leaves":       10,
-  "super_spines": 2,
-  "fabrics":      2,
-  "borders":      2,
-  "wan":          2,
-  "dns":          4,
-  "filename":     "my_datacenter"
+  "spines":            4,
+  "leaves":            10,
+  "super_spines":      2,
+  "fabrics":           2,
+  "borders":           2,
+  "wan":               2,
+  "vendor":            "cisco",
+  "include_firewalls": true,
+  "include_lbs":       true,
+  "include_dns":       false,
+  "include_ntp":       false,
+  "filename":          "my_datacenter"
 }
 ```
 
-All fields except `spines` and `leaves` are optional.
+Only `spines` and `leaves` are required. All other fields are optional.
 
 ## Files
 

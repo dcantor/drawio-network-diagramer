@@ -12,17 +12,38 @@ Topology (top to bottom):
 import argparse
 from network_diagram import NetworkDiagram, DeviceType
 
+# Vendor configuration: maps role → (DeviceType, model, short_label)
+VENDOR_CONFIG = {
+    "cisco": {
+        "super_spine": (DeviceType.SUPER_SPINE,  "N9K-C9504",          "N9K-9504"),
+        "spine":       (DeviceType.SPINE,         "N9K-9508",           "N9K-9508"),
+        "border":      (DeviceType.SWITCH,        "N9K-9504",           "N9K-9504"),
+        "leaf":        (DeviceType.SWITCH,        "N9K-C93180YC-FX3",   "N9K-93180"),
+    },
+    "arista": {
+        "super_spine": (DeviceType.ARISTA_SUPER_SPINE, "DCS-7304X3",       "DCS-7304X3"),
+        "spine":       (DeviceType.ARISTA_SPINE,       "DCS-7308X3",       "DCS-7308X3"),
+        "border":      (DeviceType.ARISTA_SWITCH,      "DCS-7304X3",       "DCS-7304X3"),
+        "leaf":        (DeviceType.ARISTA_SWITCH,      "DCS-7050SX3-48YC", "DCS-7050SX3"),
+    },
+}
+
 
 def build_diagram(
     spines:       int,
     leaves:       int,
-    borders:      int = 0,
-    wan:          int = 0,
-    dns:          int = 0,
-    super_spines: int = 0,
-    fabrics:      int = 1,
+    borders:           int  = 0,
+    wan:               int  = 0,
+    super_spines:      int  = 0,
+    fabrics:           int  = 1,
+    vendor:            str  = "cisco",
+    include_firewalls: bool = True,
+    include_lbs:       bool = True,
+    include_dns:       bool = False,
+    include_ntp:       bool = False,
 ) -> NetworkDiagram:
     """Build and return a configured NetworkDiagram (not yet saved)."""
+    vc = VENDOR_CONFIG[vendor]
     diagram = NetworkDiagram(f"Leaf-Spine Fabric ({spines} spines, {leaves} leaves)")
 
     # --- WAN layer ---
@@ -36,19 +57,21 @@ def build_diagram(
 
     # --- Border layer ---
     border_nodes = []
+    border_type, border_model, border_short = vc["border"]
     for i in range(1, borders + 1):
         node = diagram.add_node(
-            f"border{i}", f"Border-{i:02d}\nNexus 93180", DeviceType.SWITCH,
-            model="Cisco Nexus 93180YC-FX", role="Border Leaf", loopback=f"10.2.0.{i}",
+            f"border{i}", f"Border-{i:02d}\n{border_short}", border_type,
+            model=border_model, role="Border Leaf", loopback=f"10.2.0.{i}",
         )
         border_nodes.append(node)
 
     # --- Super spine layer ---
     super_spine_nodes = []
+    ss_type, ss_model, ss_short = vc["super_spine"]
     for i in range(1, super_spines + 1):
         node = diagram.add_node(
-            f"sspine{i}", f"SS-{i:02d}\nNexus 9508", DeviceType.SUPER_SPINE,
-            model="Cisco Nexus 9508", role="Super Spine", loopback=f"10.4.0.{i}",
+            f"sspine{i}", f"SS-{i:02d}\n{ss_short}", ss_type,
+            model=ss_model, role="Super Spine", loopback=f"10.4.0.{i}",
         )
         super_spine_nodes.append(node)
 
@@ -63,13 +86,16 @@ def build_diagram(
         prefix = f"f{f}_" if fabrics > 1 else ""
         label_prefix = f"F{f}-" if fabrics > 1 else ""
 
+        spine_type, spine_model, spine_short = vc["spine"]
+        leaf_type,  leaf_model,  leaf_short  = vc["leaf"]
+
         fabric_spines = []
         for i in range(1, spines + 1):
             node = diagram.add_node(
                 f"{prefix}spine{i}",
-                f"{label_prefix}Spine-{i:02d}\nNexus 9336C",
-                DeviceType.SPINE,
-                model="Cisco Nexus 9336C-FX2", role="Spine",
+                f"{label_prefix}Spine-{i:02d}\n{spine_short}",
+                spine_type,
+                model=spine_model, role="Spine",
                 fabric=f if fabrics > 1 else None,
                 loopback=f"10.0.{f}.{i}",
             )
@@ -79,9 +105,9 @@ def build_diagram(
         for i in range(1, leaves + 1):
             node = diagram.add_node(
                 f"{prefix}leaf{i}",
-                f"{label_prefix}Leaf-{i:02d}\nNexus 93180",
-                DeviceType.SWITCH,
-                model="Cisco Nexus 93180YC-FX", role="Leaf",
+                f"{label_prefix}Leaf-{i:02d}\n{leaf_short}",
+                leaf_type,
+                model=leaf_model, role="Leaf",
                 fabric=f if fabrics > 1 else None,
                 loopback=f"10.1.{f}.{i}",
                 rack=f"Rack-{((i - 1) // 2) + 1}",
@@ -118,39 +144,50 @@ def build_diagram(
 
     # --- Services — created per fabric ---
     # Node IDs include fabric index when fabrics > 1 to keep them unique.
-    firewalls     = []
+    firewalls      = []
     load_balancers = []
-    dns_servers   = []
+    dns_servers    = []
+    ntp_servers    = []
 
     for f, (_, fabric_leaves) in enumerate(all_fabric_data, start=1):
         fp = f"f{f}_" if fabrics > 1 else ""   # fabric prefix for IDs
         fl = f"F{f}-" if fabrics > 1 else ""   # fabric prefix for labels
 
         # Firewalls
-        fab_fws = []
-        for i, leaf in enumerate(fabric_leaves[:2], start=1):
-            fw = diagram.add_node(f"{fp}fw{i}", f"{fl}FW-{i:02d}\nASA 5516", DeviceType.FIREWALL,
-                                  model="Cisco ASA 5516-X", attached_to=leaf.label.split("\n")[0])
-            diagram.add_connection(leaf, fw)
-            fab_fws.append(fw)
-        if len(fab_fws) == 2:
-            diagram.add_connection(fab_fws[0], fab_fws[1])
-        firewalls.extend(fab_fws)
+        if include_firewalls:
+            fab_fws = []
+            for i, leaf in enumerate(fabric_leaves[:2], start=1):
+                fw = diagram.add_node(f"{fp}fw{i}", f"{fl}FW-{i:02d}\nASA 5516", DeviceType.FIREWALL,
+                                      model="Cisco ASA 5516-X", attached_to=leaf.label.split("\n")[0])
+                diagram.add_connection(leaf, fw)
+                fab_fws.append(fw)
+            if len(fab_fws) == 2:
+                diagram.add_connection(fab_fws[0], fab_fws[1])
+            firewalls.extend(fab_fws)
 
         # Load balancers
-        for i, leaf in enumerate(fabric_leaves[:2], start=1):
-            lb = diagram.add_node(f"{fp}lb{i}", f"{fl}LB-{i:02d}\nF5 BIG-IP", DeviceType.LOAD_BALANCER,
-                                  model="F5 BIG-IP", attached_to=leaf.label.split("\n")[0])
-            diagram.add_connection(leaf, lb)
-            load_balancers.append(lb)
+        if include_lbs:
+            for i, leaf in enumerate(fabric_leaves[:2], start=1):
+                lb = diagram.add_node(f"{fp}lb{i}", f"{fl}LB-{i:02d}\nF5 BIG-IP", DeviceType.LOAD_BALANCER,
+                                      model="F5 BIG-IP", attached_to=leaf.label.split("\n")[0])
+                diagram.add_connection(leaf, lb)
+                load_balancers.append(lb)
 
-        # DNS servers — distributed across first two leaves of each fabric
-        for i in range(dns):
-            leaf = fabric_leaves[i % 2]
-            srv  = diagram.add_node(f"{fp}dns{i + 1}", f"{fl}DNS-{i + 1:02d}", DeviceType.DNS_SERVER,
-                                    role="DNS Server", attached_to=leaf.label.split("\n")[0])
-            diagram.add_connection(leaf, srv)
-            dns_servers.append(srv)
+        # DNS servers — 2 per fabric, one on each of the first two leaves
+        if include_dns:
+            for i, leaf in enumerate(fabric_leaves[:2], start=1):
+                srv = diagram.add_node(f"{fp}dns{i}", f"{fl}DNS-{i:02d}", DeviceType.DNS_SERVER,
+                                       role="DNS Server", attached_to=leaf.label.split("\n")[0])
+                diagram.add_connection(leaf, srv)
+                dns_servers.append(srv)
+
+        # NTP servers — 2 per fabric, one on each of the first two leaves
+        if include_ntp:
+            for i, leaf in enumerate(fabric_leaves[:2], start=1):
+                srv = diagram.add_node(f"{fp}ntp{i}", f"{fl}NTP-{i:02d}", DeviceType.NTP_SERVER,
+                                       role="NTP Server", attached_to=leaf.label.split("\n")[0])
+                diagram.add_connection(leaf, srv)
+                ntp_servers.append(srv)
 
     # --- Bounding boxes ---
     if wan_routers:
@@ -192,7 +229,9 @@ def build_diagram(
     if load_balancers:
         service_groups.append(("Load Balancers", load_balancers, "#d5e8d4", "#82b366"))
     if dns_servers:
-        service_groups.append(("DNS Servers",   dns_servers,    "#e9d8fd", "#6a3d9a"))
+        service_groups.append(("DNS Servers",  dns_servers,  "#e9d8fd", "#6a3d9a"))
+    if ntp_servers:
+        service_groups.append(("NTP Servers",  ntp_servers,  "#ffe6cc", "#d79b00"))
 
     n = len(service_groups)
     for i, (label, nodes, fill, stroke) in enumerate(service_groups):
@@ -214,19 +253,22 @@ def main():
     parser.add_argument("--wan",          type=int, default=0, help="Number of WAN routers")
     parser.add_argument("--super-spine",  type=int, default=0, help="Number of super spine switches")
     parser.add_argument("--fabric",       type=int, default=1, help="Number of fabrics below the super spine layer")
-    parser.add_argument("--dns",          type=int, default=0, help="Number of DNS servers (minimum 2 if set)")
-    parser.add_argument("--output",       type=str, default="leaf_spine", help="Output filename without extension")
+    parser.add_argument("--no-firewalls",  action="store_true",       help="Omit firewalls from the diagram")
+    parser.add_argument("--no-lb",         action="store_true",       help="Omit load balancers from the diagram")
+    parser.add_argument("--dns",           action="store_true",       help="Add 2 DNS servers per fabric")
+    parser.add_argument("--ntp",           action="store_true",       help="Add 2 NTP servers per fabric")
+    parser.add_argument("--vendor",        type=str, default="cisco", choices=["cisco", "arista"], help="Switch vendor")
+    parser.add_argument("--output",        type=str, default="leaf_spine", help="Output filename without extension")
     args = parser.parse_args()
 
-    if args.dns == 1:
-        parser.error("--dns requires a minimum of 2")
     if args.fabric > 1 and args.super_spine == 0:
         parser.error("--fabric requires --super-spine to be set")
 
     output = args.output.removesuffix(".drawio") + ".drawio"
     diagram = build_diagram(
-        args.spine, args.leaf, args.border, args.wan, args.dns,
-        args.super_spine, args.fabric,
+        args.spine, args.leaf, args.border, args.wan,
+        args.super_spine, args.fabric, args.vendor,
+        not args.no_firewalls, not args.no_lb, args.dns, args.ntp,
     )
     diagram.save(output)
 

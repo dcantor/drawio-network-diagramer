@@ -12,12 +12,16 @@ class DeviceType(Enum):
     SWITCH = "switch"
     SPINE = "spine"
     SUPER_SPINE = "super_spine"
+    ARISTA_SWITCH = "arista_switch"
+    ARISTA_SPINE = "arista_spine"
+    ARISTA_SUPER_SPINE = "arista_super_spine"
     FIREWALL = "firewall"
     SERVER = "server"
     WORKSTATION = "workstation"
     CLOUD = "cloud"
     LOAD_BALANCER = "load_balancer"
     DNS_SERVER = "dns_server"
+    NTP_SERVER = "ntp_server"
     GENERIC = "generic"
 
 
@@ -41,6 +45,21 @@ _STYLES = {
     DeviceType.SUPER_SPINE: (
         "shape=mxgraph.cisco.switches.workgroup_switch;html=1;pointerEvents=1;dashed=0;"
         "fillColor=#023d5a;strokeColor=#ffffff;strokeWidth=2;"
+        "verticalLabelPosition=top;verticalAlign=bottom;align=center;outlineConnect=0;"
+    ),
+    DeviceType.ARISTA_SWITCH: (
+        "shape=mxgraph.cisco.switches.workgroup_switch;html=1;pointerEvents=1;dashed=0;"
+        "fillColor=#cc2030;strokeColor=#ffffff;strokeWidth=2;"
+        "verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;"
+    ),
+    DeviceType.ARISTA_SPINE: (
+        "shape=mxgraph.cisco.switches.workgroup_switch;html=1;pointerEvents=1;dashed=0;"
+        "fillColor=#cc2030;strokeColor=#ffffff;strokeWidth=2;"
+        "verticalLabelPosition=top;verticalAlign=bottom;align=center;outlineConnect=0;"
+    ),
+    DeviceType.ARISTA_SUPER_SPINE: (
+        "shape=mxgraph.cisco.switches.workgroup_switch;html=1;pointerEvents=1;dashed=0;"
+        "fillColor=#8b0000;strokeColor=#ffffff;strokeWidth=2;"
         "verticalLabelPosition=top;verticalAlign=bottom;align=center;outlineConnect=0;"
     ),
     DeviceType.FIREWALL: (
@@ -68,6 +87,11 @@ _STYLES = {
         "fillColor=#6a3d9a;strokeColor=#ffffff;strokeWidth=2;"
         "verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;"
     ),
+    DeviceType.NTP_SERVER: (
+        "shape=mxgraph.cisco.servers.standard_server;html=1;pointerEvents=1;dashed=0;"
+        "fillColor=#d79b00;strokeColor=#ffffff;strokeWidth=2;"
+        "verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;"
+    ),
     DeviceType.CLOUD: (
         "ellipse;whiteSpace=wrap;html=1;aspect=fixed;shape=cloud;"
         "fillColor=#dae8fc;strokeColor=#6c8ebf;"
@@ -82,12 +106,16 @@ _SIZE = {
     DeviceType.ROUTER:      (50, 50),
     DeviceType.SWITCH:      (50, 50),
     DeviceType.SPINE:       (50, 50),
-    DeviceType.SUPER_SPINE: (50, 50),
+    DeviceType.SUPER_SPINE:       (50, 50),
+    DeviceType.ARISTA_SWITCH:     (50, 50),
+    DeviceType.ARISTA_SPINE:      (50, 50),
+    DeviceType.ARISTA_SUPER_SPINE:(50, 50),
     DeviceType.FIREWALL:    (50, 50),
     DeviceType.SERVER:      (30, 50),
     DeviceType.WORKSTATION: (50, 50),
     DeviceType.LOAD_BALANCER: (50, 50),
     DeviceType.DNS_SERVER:   (30, 50),
+    DeviceType.NTP_SERVER:   (30, 50),
     DeviceType.CLOUD:       (120, 80),
     DeviceType.GENERIC:     (120, 60),
 }
