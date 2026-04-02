@@ -2,6 +2,12 @@
 
 Generates Cisco and Arista network topology diagrams in [draw.io](https://app.diagrams.net) format. Supports leaf-spine fabrics with optional super spine, WAN, border, multiple fabric pods, and per-fabric services.
 
+## Screenshots
+
+![Network diagram example](screenshot1.png)
+
+![Web interface](screenshot2.png)
+
 ## Quick Start
 
 ```bash
