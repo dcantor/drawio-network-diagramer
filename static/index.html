@@ -285,6 +285,11 @@
         </div>
       </div>
 
+      <div class="field">
+        <label for="vlan_map">VLAN map <span>(optional — adds a Logical Details tab)</span></label>
+        <textarea id="vlan_map" rows="3" placeholder="e.g. leaf1: 10,20,30, leaf2: 10,40, leaf3: 20,50" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:13px;padding:6px;border:1px solid #ccc;border-radius:4px;resize:vertical;"></textarea>
+      </div>
+
       <button type="submit" id="btn">Generate &amp; Download</button>
     </form>
 
@@ -323,6 +328,7 @@
       const include_ntp       = document.getElementById("include_ntp").checked;
       const filename  = document.getElementById("filename").value.trim() || "leaf_spine";
       const mgmt_pool = document.getElementById("mgmt_pool").value.trim() || null;
+      const vlan_map  = document.getElementById("vlan_map").value.trim() || null;
 
       btn.disabled = true;
       setStatus("Generating diagram…", "loading");
@@ -331,7 +337,7 @@
         const res = await fetch("/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ spines, leaves, borders, wan, super_spines, fabrics, vendor, include_firewalls, include_lbs, include_dns, include_ntp, mgmt_pool, filename }),
+          body: JSON.stringify({ spines, leaves, borders, wan, super_spines, fabrics, vendor, include_firewalls, include_lbs, include_dns, include_ntp, mgmt_pool, vlan_map, filename }),
         });
 
         if (!res.ok) {

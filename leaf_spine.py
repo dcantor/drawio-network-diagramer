@@ -11,7 +11,19 @@ Topology (top to bottom):
 
 import argparse
 import ipaddress
+import re
 from network_diagram import NetworkDiagram, DeviceType
+
+
+def _parse_vlan_map(vlan_str: str) -> dict[str, list[int]]:
+    """Parse a VLAN map string like 'leaf1: 10,20,30, leaf2: 10,40' into a dict."""
+    result = {}
+    for match in re.finditer(r'(\w+)\s*:\s*([\d,\s]*?)(?=\s*\w+\s*:|$)', vlan_str.strip()):
+        leaf_id = match.group(1)
+        vlans = [int(v) for v in re.findall(r'\d+', match.group(2))]
+        if vlans:
+            result[leaf_id] = vlans
+    return result
 
 # Vendor configuration: maps role → (DeviceType, model, short_label)
 VENDOR_CONFIG = {
@@ -43,10 +55,11 @@ def build_diagram(
     include_dns:       bool = False,
     include_ntp:       bool = False,
     mgmt_pool:         str | None = None,
+    vlan_map:          str | None = None,
 ) -> NetworkDiagram:
     """Build and return a configured NetworkDiagram (not yet saved)."""
     vc = VENDOR_CONFIG[vendor]
-    diagram = NetworkDiagram(f"Leaf-Spine Fabric ({spines} spines, {leaves} leaves)")
+    diagram = NetworkDiagram("Physical Topology")
 
     # --- WAN layer ---
     wan_routers = []
@@ -242,6 +255,10 @@ def build_diagram(
     diagram.H_SPACING = 150
     diagram.V_SPACING = 220
 
+    # --- VLAN map ---
+    if vlan_map:
+        diagram.set_vlan_map(_parse_vlan_map(vlan_map))
+
     # --- Management IP allocation ---
     if mgmt_pool:
         network = ipaddress.ip_network(mgmt_pool, strict=False)
@@ -273,6 +290,7 @@ def main():
     parser.add_argument("--ntp",           action="store_true",       help="Add 2 NTP servers per fabric")
     parser.add_argument("--vendor",        type=str, default="cisco", choices=["cisco", "arista"], help="Switch vendor")
     parser.add_argument("--mgmt-pool",     type=str, default=None, help="Subnet to allocate management IPs from (e.g. 10.0.0.0/24)")
+    parser.add_argument("--vlan-map",      type=str, default=None, help="VLAN-to-leaf mapping (e.g. 'leaf1: 10,20, leaf2: 10,30')")
     parser.add_argument("--output",        type=str, default="leaf_spine", help="Output filename without extension")
     args = parser.parse_args()
 
@@ -284,7 +302,7 @@ def main():
         args.spine, args.leaf, args.border, args.wan,
         args.super_spine, args.fabric, args.vendor,
         not args.no_firewalls, not args.no_lb, args.dns, args.ntp,
-        args.mgmt_pool,
+        args.mgmt_pool, args.vlan_map,
     )
     diagram.save(output)
 

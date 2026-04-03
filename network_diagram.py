@@ -165,6 +165,7 @@ class NetworkDiagram:
         self._connections: list[Connection] = []
         self._groups: list[tuple[str, list[Node], int]] = []
         self._cell_counter = 2          # 0 and 1 are reserved by draw.io
+        self._vlan_map: dict[str, list[int]] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -197,6 +198,13 @@ class NetworkDiagram:
         h_nudge shifts the group's nodes left (negative) or right (positive) after layout.
         """
         self._groups.append((label, nodes, padding, fill_color, stroke_color, h_nudge))
+
+    def set_vlan_map(self, vlan_map: dict[str, list[int]]) -> None:
+        """Supply a mapping of leaf node IDs to VLAN lists for the Logical Details tab."""
+        unknown = [k for k in vlan_map if k not in self._nodes]
+        if unknown:
+            raise ValueError(f"Unknown node IDs in VLAN map: {', '.join(unknown)}")
+        self._vlan_map = vlan_map
 
     def add_connection(
         self,
@@ -407,5 +415,77 @@ class NetworkDiagram:
             )
             ET.SubElement(cell, "mxGeometry", relative="1", **{"as": "geometry"})
 
+        if self._vlan_map:
+            self._build_logical_tab(mxfile)
+
         ET.indent(mxfile, space="  ")
         return ET.tostring(mxfile, encoding="unicode", xml_declaration=True)
+
+    def _build_logical_tab(self, mxfile: ET.Element) -> None:
+        """Append a 'Logical Details' diagram tab showing VLAN-to-leaf mappings."""
+        diagram = ET.SubElement(mxfile, "diagram", name="Logical Details")
+        model = ET.SubElement(
+            diagram, "mxGraphModel",
+            dx="1422", dy="762", grid="1", gridSize="10",
+            guides="1", tooltips="1", connect="1", arrows="1",
+            fold="1", page="1", pageScale="1",
+            pageWidth="1169", pageHeight="827",
+            math="0", shadow="0",
+        )
+        root = ET.SubElement(model, "root")
+        ET.SubElement(root, "mxCell", id="0")
+        ET.SubElement(root, "mxCell", id="1", parent="0")
+
+        COL_W     = 150
+        COL_GAP   = 20
+        ROW_H     = 28
+        HEADER_H  = 30
+        START_X   = 20
+        START_Y   = 20
+        counter   = 2
+
+        for col, (leaf_id, vlans) in enumerate(self._vlan_map.items()):
+            node = self._nodes.get(leaf_id)
+            label = node.label.split("\n")[0] if node else leaf_id
+
+            x = START_X + col * (COL_W + COL_GAP)
+            total_h = HEADER_H + len(vlans) * ROW_H
+
+            container_id = str(counter); counter += 1
+            container = ET.SubElement(
+                root, "mxCell",
+                id=container_id,
+                value=label,
+                style=(
+                    "swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;"
+                    "fontStyle=1;fontSize=11;"
+                ),
+                vertex="1",
+                parent="1",
+            )
+            ET.SubElement(
+                container, "mxGeometry",
+                x=str(x), y=str(START_Y),
+                width=str(COL_W), height=str(total_h),
+                **{"as": "geometry"},
+            )
+
+            for row, vlan in enumerate(sorted(vlans)):
+                vlan_id = str(counter); counter += 1
+                vlan_cell = ET.SubElement(
+                    root, "mxCell",
+                    id=vlan_id,
+                    value=f"VLAN {vlan}",
+                    style=(
+                        "text;align=center;verticalAlign=middle;"
+                        "fillColor=#fff2cc;strokeColor=#d6b656;"
+                    ),
+                    vertex="1",
+                    parent=container_id,
+                )
+                ET.SubElement(
+                    vlan_cell, "mxGeometry",
+                    x="0", y=str(HEADER_H + row * ROW_H),
+                    width=str(COL_W), height=str(ROW_H),
+                    **{"as": "geometry"},
+                )

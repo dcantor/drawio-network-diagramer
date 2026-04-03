@@ -32,6 +32,7 @@ class DiagramRequest(BaseModel):
     include_dns:       bool = False
     include_ntp:       bool = False
     mgmt_pool:         str | None = None
+    vlan_map:          str | None = None
     filename:          str = Field(default="leaf_spine", max_length=128)
 
     @model_validator(mode="after")
@@ -60,7 +61,7 @@ def generate(req: DiagramRequest):
             req.spines, req.leaves, req.borders, req.wan,
             req.super_spines, req.fabrics, req.vendor,
             req.include_firewalls, req.include_lbs, req.include_dns, req.include_ntp,
-            req.mgmt_pool,
+            req.mgmt_pool, req.vlan_map,
         )
         xml_str = diagram.to_xml()
     except ValueError as e:
